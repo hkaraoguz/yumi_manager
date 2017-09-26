@@ -88,6 +88,15 @@ void doneCbPickPlace(const actionlib::SimpleClientGoalState& state,
     }
 
     yumi_manager::SceneObjects so;
+
+    if(result->result == -2)
+    {
+        so.yumi_status=2;
+        scene_publisher.publish(so);
+        return;
+
+    }
+
     so.array = objects;
     so.yumi_status=0;
     scene_publisher.publish(so);
@@ -103,16 +112,27 @@ void doneCbPoint(const actionlib::SimpleClientGoalState& state,
     objects.clear();
     perception_manager::QueryObjects query_objects_srv;
 
-    if(query_objects_client.call(query_objects_srv))
+
+    yumi_manager::SceneObjects so;
+    // This means task is aborted because of planning fail
+    if(result->result == -2)
+    {
+        so.yumi_status=2;
+        scene_publisher.publish(so);
+        return;
+
+    }
+
+   /* if(query_objects_client.call(query_objects_srv))
     {
         objects = query_objects_srv.response.objects ;
 
     }
 
-    yumi_manager::SceneObjects so;
+
     so.array = objects;
     so.yumi_status=0;
-    scene_publisher.publish(so);
+    scene_publisher.publish(so);*/
     //ros::shutdown();
 }
 void doneCbHome(const actionlib::SimpleClientGoalState& state,
@@ -132,6 +152,14 @@ void doneCbHome(const actionlib::SimpleClientGoalState& state,
     }
 
     yumi_manager::SceneObjects so;
+
+    if(result->result == -2)
+    {
+        so.yumi_status=2;
+        scene_publisher.publish(so);
+        return;
+
+    }
     so.array = objects;
     so.yumi_status=0;
     scene_publisher.publish(so);
@@ -208,7 +236,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
                 pickplace_goal.location.position.y = objects[min_index].metricposcentery;
 
                 if(objects[min_index].angle > 0)
-                    pickplace_goal.location.orientation.z = objects[min_index].angle+1.57;
+                    pickplace_goal.location.orientation.z = objects[min_index].angle;
                 else
                     pickplace_goal.location.orientation.z = objects[min_index].angle;
                 //wait for the action to return
@@ -449,7 +477,7 @@ int main(int argc, char** argv)
     {
 
         ros::spinOnce();
-        r.sleep();
+
 
         if(selected_index >= 0)
         {
@@ -481,7 +509,7 @@ int main(int argc, char** argv)
 
 
 
-
+        r.sleep();
 
     }
 }
