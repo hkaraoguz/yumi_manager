@@ -44,7 +44,7 @@ typedef actionlib::SimpleActionClient<yumi_actions::PickPlaceAction> pickplaceCl
 typedef actionlib::SimpleActionClient<yumi_actions::PointAction> pointClient;
 typedef actionlib::SimpleActionClient<yumi_actions::HomeAction> homeClient;
 
-Mat temp_img;
+//Mat temp_img;
 Mat ss_img;
 
 
@@ -337,7 +337,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         ros::shutdown();
     }
 
-    temp_img = cv_bridge::toCvShare(msg, "bgr8")->image;
+    Mat temp_img = cv_bridge::toCvShare(msg, "bgr8")->image;
     ss_img = cv_bridge::toCvCopy(msg, "bgr8")->image;
 
     for(size_t i =0 ; i < objects.size(); i++)
