@@ -44,6 +44,10 @@ typedef actionlib::SimpleActionClient<yumi_actions::PickPlaceAction> pickplaceCl
 typedef actionlib::SimpleActionClient<yumi_actions::PointAction> pointClient;
 typedef actionlib::SimpleActionClient<yumi_actions::HomeAction> homeClient;
 
+Mat temp_img;
+Mat ss_img;
+
+
 
 yumi_actions::PickPlaceGoal pickplace_goal;
 yumi_actions::PointGoal point_goal;
@@ -70,6 +74,39 @@ string getHomePath()
     return str;
 
 }
+bool saveImage()
+{
+    string configpath = getHomePath();
+
+    configpath += "/yumi_manager/";
+
+    boost::filesystem::path dir(configpath);
+
+    if(!(boost::filesystem::exists(dir)))
+    {
+        std::cout<<"Doesn't Exists"<<std::endl;
+
+    }
+
+    if (boost::filesystem::create_directory(dir))
+        std::cout << "....Successfully Created !" << std::endl;
+
+    stringstream ss;
+
+    ss<<ros::Time::now();
+
+    configpath += "image_";
+    configpath += ss.str();
+    configpath+= ".jpg";
+
+    if(ss_img.rows > 0)
+    {
+        cv::imwrite(configpath.data(),ss_img);
+        return true;
+    }
+
+    return false;
+}
 
 void doneCbPickPlace(const actionlib::SimpleClientGoalState& state,
                      const yumi_actions::PickPlaceResultConstPtr& result)
@@ -95,6 +132,11 @@ void doneCbPickPlace(const actionlib::SimpleClientGoalState& state,
         scene_publisher.publish(so);
         return;
 
+    }
+
+    if(saveImage())
+    {
+        ROS_INFO("Image successfully saved!");
     }
 
     so.array = objects;
@@ -160,6 +202,12 @@ void doneCbHome(const actionlib::SimpleClientGoalState& state,
         return;
 
     }
+
+    if(saveImage())
+    {
+        ROS_INFO("Image successfully saved!");
+    }
+
     so.array = objects;
     so.yumi_status=0;
     scene_publisher.publish(so);
@@ -289,7 +337,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         ros::shutdown();
     }
 
-    Mat temp_img = cv_bridge::toCvShare(msg, "bgr8")->image;
+    temp_img = cv_bridge::toCvShare(msg, "bgr8")->image;
+    ss_img = cv_bridge::toCvCopy(msg, "bgr8")->image;
 
     for(size_t i =0 ; i < objects.size(); i++)
     {
@@ -325,6 +374,11 @@ void callBackButtonRefreshScene(int state, void*)
 {
     objects.clear();
     perception_manager::QueryObjects query_objects_srv;
+
+    if(saveImage())
+    {
+        ROS_INFO("Image successfully saved!");
+    }
 
     if(query_objects_client.call(query_objects_srv))
     {
