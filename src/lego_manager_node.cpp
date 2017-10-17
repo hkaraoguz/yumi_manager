@@ -457,7 +457,7 @@ void commandCallback(const yumi_eneroth_bridge::CommandConstPtr& msg)
             pickplace_goal.location.position.y = objects[min_index].metricposcentery;
 
             if(objects[min_index].angle > 0)
-                pickplace_goal.location.orientation.z = objects[min_index].angle+1.57;
+                pickplace_goal.location.orientation.z = objects[min_index].angle;
             else
                 pickplace_goal.location.orientation.z = objects[min_index].angle;
             //wait for the action to return
