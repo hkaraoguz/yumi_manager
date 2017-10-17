@@ -366,8 +366,19 @@ void callBackButtonPoint(int state, void*)
     {
         pick_and_place = false;
         point = true;
+
         ROS_INFO("Point action is selected");
     }
+
+}
+void callBackButtonHome(int state, void*)
+{
+    home = true;
+    pick_and_place = false;
+    point = false;
+    //yumi_actions::HomeGoal hgoal;
+    ROS_INFO("Sending goal to return home position action.");
+
 
 }
 void callBackButtonRefreshScene(int state, void*)
@@ -484,6 +495,7 @@ int main(int argc, char** argv)
     createButton("pick_and_place",callBackButtonPickandPlace,NULL,CV_RADIOBOX,1);
     createButton("point",callBackButtonPoint,NULL,CV_RADIOBOX,0);
     createButton("Refresh Scene",callBackButtonRefreshScene,NULL,CV_PUSH_BUTTON);
+     createButton("Home Position",callBackButtonHome,NULL,CV_PUSH_BUTTON);
 
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber sub = it.subscribe("kinect2/hd/image_color", 1, imageCallback);
@@ -554,6 +566,7 @@ int main(int argc, char** argv)
 
         if(home && !yumi_busy)
         {
+            selected_index = -1;
             home = false;
             yumi_actions::HomeGoal hgoal;
             ROS_INFO("Sending goal to return home position action.");
