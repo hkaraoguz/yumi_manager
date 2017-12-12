@@ -29,12 +29,18 @@
 #include <yumi_manager/SceneObjects.h>
 
 
+#include <moveit_msgs/RobotTrajectory.h>
+#include <trajectory_msgs/JointTrajectory.h>
+
+#include <yumi_demos/PlanforAction.h>
+
 using namespace std;
 using namespace cv;
 
 bool point = false;
 bool pick_and_place = true;
 bool home = false;
+bool planfor_action = false;
 
 bool yumi_busy = false;
 
@@ -56,6 +62,8 @@ yumi_actions::PointGoal point_goal;
 vector<perception_manager::TabletopObject> objects;
 
 ros::ServiceClient query_objects_client;
+
+ros::ServiceClient planforaction_client;
 
 ros::Publisher scene_publisher;
 
@@ -165,7 +173,7 @@ void doneCbPoint(const actionlib::SimpleClientGoalState& state,
 
     }
 
-   /* if(query_objects_client.call(query_objects_srv))
+    /* if(query_objects_client.call(query_objects_srv))
     {
         objects = query_objects_srv.response.objects ;
 
@@ -381,6 +389,24 @@ void callBackButtonHome(int state, void*)
 
 
 }
+void callBackButtonPlanAction(int state, void*)
+{
+
+    if (planfor_action){
+
+        ROS_WARN("Plan for action disabled!");
+
+        planfor_action = false;
+
+    }
+    else{
+        planfor_action = true;
+
+        ROS_WARN("Plan for action enabled!");
+    }
+
+
+}
 void callBackButtonRefreshScene(int state, void*)
 {
     objects.clear();
@@ -439,7 +465,7 @@ void commandCallback(const yumi_eneroth_bridge::CommandConstPtr& msg)
             min_index = i;
         }
 
-       // std::cout<<min_index<<endl;
+        // std::cout<<min_index<<endl;
     }
 
     if(min_index >= 0  && min_sum <= 0.05)
@@ -495,16 +521,21 @@ int main(int argc, char** argv)
     createButton("pick_and_place",callBackButtonPickandPlace,NULL,CV_RADIOBOX,1);
     createButton("point",callBackButtonPoint,NULL,CV_RADIOBOX,0);
     createButton("Refresh Scene",callBackButtonRefreshScene,NULL,CV_PUSH_BUTTON);
-     createButton("Home Position",callBackButtonHome,NULL,CV_PUSH_BUTTON);
+    createButton("Home Position",callBackButtonHome,NULL,CV_PUSH_BUTTON);
+    createButton("Plan Action",callBackButtonPlanAction,NULL,CV_PUSH_BUTTON);
 
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber sub = it.subscribe("kinect2/hd/image_color", 1, imageCallback);
 
     ros::Subscriber subs = nh.subscribe("yumi_eneroth_bridge/command",1,commandCallback);
 
+    ros::Publisher joint_pub = nh.advertise<trajectory_msgs::JointTrajectory>("yumi/traj_moveit",10);
+
     scene_publisher = nh.advertise<yumi_manager::SceneObjects>("yumi_manager/scene_objects",1);
 
     query_objects_client = nh.serviceClient<perception_manager::QueryObjects>("perception_manager/query_objects");
+
+    planforaction_client = nh.serviceClient<yumi_demos::PlanforAction>("yumi_plan_action");
 
     perception_manager::QueryObjects query_objects_srv;
 
@@ -519,7 +550,7 @@ int main(int argc, char** argv)
     so.array = objects;
     scene_publisher.publish(so);
 
-    pickplaceClient ppc("pick_and_place", true);
+    pickplaceClient ppc("yumi_pick_and_place", true);
     pointClient pc("yumi_point", true);
     homeClient hc("yumi_home_position", true);
 
@@ -550,16 +581,58 @@ int main(int argc, char** argv)
 
             selected_index = -1;
 
-            if(pick_and_place && !yumi_busy)
+            if(pick_and_place && !yumi_busy && !planfor_action)
             {
                 // send a goal to the action
                 ROS_INFO("Sending goal to pick and place action.");
                 ppc.sendGoal(pickplace_goal,&doneCbPickPlace, &activeCb, &feedbackCbPickPlace);
             }
-            else if(point && !yumi_busy)
+            else if(point && !yumi_busy&& !planfor_action)
             {
                 ROS_INFO("Sending goal to point action.");
                 pc.sendGoal(point_goal,&doneCbPoint,&activeCb,&feedbackCbPoint);
+
+            }
+            else if(pick_and_place && planfor_action)
+            {
+
+
+                yumi_demos::PlanforAction planfor_action_srv;
+
+                planfor_action_srv.request.action = 0;
+
+                planfor_action_srv.request.location = pickplace_goal.location;
+
+                if(planforaction_client.call(planfor_action_srv))
+                {
+                    for(auto robottraj:planfor_action_srv.response.trajectories) {
+
+                        joint_pub.publish(robottraj.joint_trajectory);
+                    }
+
+                }
+
+
+            }
+            else if(point && planfor_action)
+            {
+
+
+                yumi_demos::PlanforAction planfor_action_srv;
+
+                planfor_action_srv.request.action = 1;
+
+                planfor_action_srv.request.location = point_goal.location;
+
+                if(planforaction_client.call(planfor_action_srv))
+                {
+                    for(auto robottraj:planfor_action_srv.response.trajectories) {
+
+                        joint_pub.publish(robottraj.joint_trajectory);
+                    }
+
+                }
+
 
             }
         }

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(yumi_manager)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+ add_compile_options(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -17,6 +17,8 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   yumi_eneroth_bridge
   message_generation
+  trajectory_msgs
+  moveit_msgs
 )
 
 find_package(OpenCV REQUIRED)
