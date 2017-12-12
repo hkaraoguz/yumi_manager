@@ -382,8 +382,9 @@ void callBackButtonPoint(int state, void*)
 void callBackButtonHome(int state, void*)
 {
     home = true;
-    pick_and_place = false;
-    point = false;
+    selected_index = -1;
+    //pick_and_place = false;
+    //point = false;
     //yumi_actions::HomeGoal hgoal;
     ROS_INFO("Sending goal to return home position action.");
 
@@ -441,8 +442,8 @@ void commandCallback(const yumi_eneroth_bridge::CommandConstPtr& msg)
         ROS_INFO("Home action ");
         selected_index = -1;
         home = true;
-        pick_and_place = false;
-        point = false;
+       // pick_and_place = false;
+       // point = false;
         return;
     }
 
