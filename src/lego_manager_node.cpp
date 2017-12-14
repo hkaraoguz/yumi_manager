@@ -142,10 +142,10 @@ void doneCbPickPlace(const actionlib::SimpleClientGoalState& state,
 
     }
 
-    if(saveImage())
+   /* if(saveImage())
     {
         ROS_INFO("Image successfully saved!");
-    }
+    }*/
 
     so.array = objects;
     so.yumi_status=0;
@@ -457,8 +457,8 @@ void commandCallback(const yumi_eneroth_bridge::CommandConstPtr& msg)
         //cout<<objects[i].metricpostablecenterx<<" "<<objects[i].metricpostablecentery<<endl;
         //cout<<msg->posx<<" "<<msg->posy<<endl;
 
-        sum+= fabs(objects[i].metricpostablecenterx-msg->posx);
-        sum+= fabs(objects[i].metricpostablecentery-msg->posy);
+        sum+= fabs(objects[i].metricposcenterx - msg->posx);
+        sum+= fabs(objects[i].metricposcentery - msg->posy);
 
         if(sum < min_sum)
         {
@@ -551,14 +551,14 @@ int main(int argc, char** argv)
     so.array = objects;
     scene_publisher.publish(so);
 
-    pickplaceClient ppc("yumi_pick_and_place", true);
-    pointClient pc("yumi_point", true);
-    homeClient hc("yumi_home_position", true);
+    pickplaceClient ppc("skill_yumi_pick_and_place", true);
+    pointClient pc("skill_yumi_point", true);
+    homeClient hc("skill_yumi_home_position", true);
 
 
-    ppc.waitForServer(ros::Duration(10));
-    pc.waitForServer(ros::Duration(10));
-    hc.waitForServer(ros::Duration(10));
+    ppc.waitForServer(ros::Duration(2));
+    pc.waitForServer(ros::Duration(2));
+    hc.waitForServer(ros::Duration(2));
 
     ROS_INFO("Action server started, waiting for goal.");
 
