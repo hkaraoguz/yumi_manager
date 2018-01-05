@@ -667,7 +667,7 @@ int main(int argc, char** argv)
 
     pickplaceClient ppc("skill_yumi_pick_and_place", true);
     pointClient pc("skill_yumi_point", true);
-    homeClient hc("skill_yumi_home_position", true);
+    homeClient hc("skill_yumi_home", true);
 
 
     ppc.waitForServer(ros::Duration(2));
