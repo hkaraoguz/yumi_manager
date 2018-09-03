@@ -260,7 +260,7 @@ void leapHandCallback(std_msgs::Float32 msg)
             }
         }
 
-        if(min_index >= 0  && min_sum <= 10)
+        if(min_index >= 0  && min_sum <= 30)
         {
             ROS_INFO("Selected id: %d",min_index);
 
@@ -665,9 +665,9 @@ int main(int argc, char** argv)
     so.array = objects;
     scene_publisher.publish(so);
 
-    pickplaceClient ppc("skill_yumi_pick_and_place", true);
-    pointClient pc("skill_yumi_point", true);
-    homeClient hc("skill_yumi_home", true);
+    pickplaceClient ppc("moveit_yumi_pick_and_place", true);
+    pointClient pc("moveit_yumi_point", true);
+    homeClient hc("moveit_yumi_home", true);
 
 
     ppc.waitForServer(ros::Duration(2));
