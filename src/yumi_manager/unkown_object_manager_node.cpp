@@ -17,6 +17,7 @@
 
 #include <perception_manager/QueryObjects.h>
 #include <perception_manager/TabletopObject.h>
+#include <perception_manager/GetMetricCoordinate.h>
 
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
@@ -60,17 +61,6 @@ Mat ss_img;
 
 tf::TransformListener* listener;
 
-double camera_fx = 1049.46;
-double camera_fy = 1050.24;
-
-int camera_principal_center_x=951;
-int camera_principal_center_y=534;
-
-
-int leap_pixel_x;
-int leap_pixel_y;
-
-
 yumi_actions::PickPlaceGoal pickplace_goal;
 yumi_actions::PointGoal point_goal;
 
@@ -79,9 +69,18 @@ vector<perception_manager::TabletopObject> objects;
 
 ros::ServiceClient query_objects_client;
 
-ros::ServiceClient planforaction_client;
+ros::ServiceClient getmetriccoordinate_client;
 
-ros::Publisher scene_publisher;
+int unknown_pose_x = -1;
+
+int unknown_pose_y = -1;
+
+int workspace_min_x=0;
+int workspace_max_x=0;
+
+int workspace_min_y=0;
+
+int workspace_max_y=0;
 
 
 
@@ -100,6 +99,75 @@ string getHomePath()
     return str;
 
 }
+
+bool readWorkspaceConfig(string path, int *minX, int *maxX, int *minY, int *maxY)
+{
+    string configpath;
+
+    std::cout<<path.size()<<std::endl;
+
+    if (path.size()==0)
+    {
+
+        configpath = getHomePath();
+
+        configpath += "/.ros/workspace_segmentation/";
+
+        configpath += "workspace.txt";
+    }
+    else
+    {
+        configpath = path;
+    }
+
+    std::cout<<configpath<<std::endl;
+
+    ifstream stream(configpath.data());
+
+    if(stream.is_open())
+    {
+        string str;
+        int count = 0;
+        while(getline(stream, str))
+        {
+
+            std::istringstream ss(str);
+
+            //std::cout<<str<<endl;
+
+            switch(count)
+            {
+            case 0:
+                *minX = atoi(str.data());
+            case 1:
+                *maxX = atoi(str.data());
+            case 2:
+                *minY  = atoi(str.data());
+            case 3:
+                *maxY = atoi(str.data());
+            default:
+                break;
+
+            }
+
+            count++;
+
+        }
+
+
+        stream.close();
+
+
+
+    }
+    else
+    {
+        return false;
+    }
+
+    return true;
+}
+
 bool saveImage()
 {
     string configpath = getHomePath();
@@ -150,25 +218,10 @@ void doneCbPickPlace(const actionlib::SimpleClientGoalState& state,
 
     }
 
-    yumi_manager::SceneObjects so;
 
-    if(result->result == -2)
-    {
-        so.yumi_status=2;
-        scene_publisher.publish(so);
-        return;
 
-    }
 
-    /* if(saveImage())
-    {
-        ROS_INFO("Image successfully saved!");
-    }*/
 
-    so.array = objects;
-    so.yumi_status=0;
-    scene_publisher.publish(so);
-    //ros::shutdown();
 }
 void doneCbPoint(const actionlib::SimpleClientGoalState& state,
                  const yumi_actions::PointResultConstPtr& result)
@@ -177,31 +230,7 @@ void doneCbPoint(const actionlib::SimpleClientGoalState& state,
     ROS_INFO("Finished in state [%s]", state.toString().c_str());
     ROS_INFO("Answer: %d", result->result);
 
-    objects.clear();
-    perception_manager::QueryObjects query_objects_srv;
 
-
-    yumi_manager::SceneObjects so;
-    // This means task is aborted because of planning fail
-    if(result->result == -2)
-    {
-        so.yumi_status=2;
-        scene_publisher.publish(so);
-        return;
-
-    }
-
-    /* if(query_objects_client.call(query_objects_srv))
-    {
-        objects = query_objects_srv.response.objects ;
-
-    }
-
-
-    so.array = objects;
-    so.yumi_status=0;
-    scene_publisher.publish(so);*/
-    //ros::shutdown();
 }
 void doneCbHome(const actionlib::SimpleClientGoalState& state,
                 const yumi_actions::HomeResultConstPtr& result)
@@ -211,80 +240,11 @@ void doneCbHome(const actionlib::SimpleClientGoalState& state,
     ROS_INFO("Answer: %d", result->result);
 
 
-    perception_manager::QueryObjects query_objects_srv;
 
-    if(query_objects_client.call(query_objects_srv))
-    {
-        objects = query_objects_srv.response.objects ;
-
-    }
-
-    yumi_manager::SceneObjects so;
-
-    if(result->result == -2)
-    {
-        so.yumi_status=2;
-        scene_publisher.publish(so);
-        return;
-
-    }
-
-    if(saveImage())
-    {
-        ROS_INFO("Image successfully saved!");
-    }
-
-    so.array = objects;
-    so.yumi_status=0;
-    scene_publisher.publish(so);
     //ros::shutdown();
 }
 
-void leapHandCallback(std_msgs::Float32 msg)
-{
-    if(msg.data == 1.0)
-    {
-        int min_sum = 100000;
-        int min_index = -1;
-        for(size_t i =0 ; i < objects.size(); i++)
-        {
-            int sum = 0;
 
-            sum+= abs(objects[i].pixelposcenterx-leap_pixel_x);
-            sum+= abs(leap_pixel_y-objects[i].pixelposcentery);
-
-            if(sum < min_sum)
-            {
-                min_sum = sum;
-                min_index = i;
-            }
-        }
-
-        if(min_index >= 0  && min_sum <= 30)
-        {
-            ROS_INFO("Selected id: %d",min_index);
-
-            selected_index = min_index;
-
-            if(pick_and_place)
-            {
-
-                pickplace_goal.location.position.x = objects[min_index].metricposcenterx;
-                pickplace_goal.location.position.y = objects[min_index].metricposcentery;
-
-                if(objects[min_index].angle > 0)
-                    pickplace_goal.location.orientation.z = objects[min_index].angle;
-                else
-                    pickplace_goal.location.orientation.z = objects[min_index].angle;
-                //wait for the action to return
-                // bool finished_before_timeout = ac.waitForResult(ros::Duration(30.0));
-                ROS_INFO("Angle %.2f", pickplace_goal.location.orientation.z*180/3.14159);
-
-            }
-        }
-    }
-
-}
 
 
 // Called once when the goal becomes active
@@ -394,16 +354,6 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }*/
 }
 
-void calculatePixelPosition(double posx, double posy, double posz, int* pixelx, int* pixely)
-{
-    *pixelx = (int)(posx*camera_fx/posz)+camera_principal_center_x;
-
-    *pixely= (int)(posy*camera_fy/posz)+camera_principal_center_y;
-
-}
-
-
-
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
 
@@ -423,19 +373,19 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     int pixelx=0,pixely=0;
 
-    try{
+    /*try{
         //if(listener.waitForTransform("yumi_base_link","teleop_left_frame",ros::Time::now(), ros::Duration(1.0)))
         //{
         listener->lookupTransform("/kinect2_rgb_optical_frame","/teleop_left_frame",
                                   ros::Time(0), transform1);
 
-      //  std::cout<<"Left hand position"<<transform1.getOrigin().getX()<<" "<<transform1.getOrigin().getZ()<<std::endl;
+        //  std::cout<<"Left hand position"<<transform1.getOrigin().getX()<<" "<<transform1.getOrigin().getZ()<<std::endl;
 
 
 
         calculatePixelPosition(transform1.getOrigin().getX(),transform1.getOrigin().getY(),transform1.getOrigin().getZ(),&leap_pixel_x,&leap_pixel_y);
 
-     //   std::cout<<"Left hand position in pixels "<<leap_pixel_x<<" "<<leap_pixel_y<<std::endl;
+        //   std::cout<<"Left hand position in pixels "<<leap_pixel_x<<" "<<leap_pixel_y<<std::endl;
 
         //}
 
@@ -444,9 +394,9 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     }
 
     catch (tf::TransformException ex){
-       // ROS_ERROR("%s",ex.what());
+        // ROS_ERROR("%s",ex.what());
         //ros::Duration(1.0).sleep();
-    }
+    }*/
 
     Mat temp_img = cv_bridge::toCvShare(msg, "bgr8")->image;
     ss_img = cv_bridge::toCvCopy(msg, "bgr8")->image;
@@ -467,8 +417,6 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     Point pt;
 
-    pt.x = leap_pixel_x;
-    pt.y = leap_pixel_y;
 
     circle(temp_img, pt, 6, cv::Scalar(255,0,255), -1);
 
@@ -500,53 +448,84 @@ void callBackButtonHome(int state, void*)
 
 
 }
-void callBackButtonPlanAction(int state, void*)
+void callBackButtonExecute(int state, void*)
 {
 
-    if (planfor_action){
+    if(unknown_pose_x >= 0 && unknown_pose_y >= 0)
+    {
+        perception_manager::GetMetricCoordinate srv;
+        srv.request.x_coord = unknown_pose_x;
+        srv.request.y_coord = unknown_pose_y;
 
-        ROS_WARN("Plan for action disabled!");
+        if(getmetriccoordinate_client.call(srv))
+        {
 
-        planfor_action = false;
+            point_goal.location.position.x = srv.response.point.point.x;
+            point_goal.location.position.y = srv.response.point.point.y;
+
+
+            std::cout<<unknown_pose_x<<" "<<unknown_pose_y<<std::endl;
+
+
+            pick_and_place = false;
+            point = true;
+            selected_index = 1;
+
+            ROS_INFO("Sending goal to point action.");
+        }
 
     }
-    else{
-        planfor_action = true;
 
-        ROS_WARN("Plan for action enabled!");
+    else
+    {
+        ROS_INFO("Invalid Unknown Pose Coordinates x:%d y:%d",unknown_pose_x,unknown_pose_y);
     }
 
 
 }
-void callBackButtonRefreshScene(int state, void*)
+void unknownPoseCallback(const std_msgs::String& msg)
 {
-    objects.clear();
-    perception_manager::QueryObjects query_objects_srv;
+    std::string str = msg.data;
 
-    if(saveImage())
+    std::stringstream ss(str);
+    std::string item;
+    std::vector<std::string> elems;
+    while (std::getline(ss, item, ';'))
     {
-        ROS_INFO("Image successfully saved!");
+        elems.push_back(item);
+        // elems.push_back(std::move(item)); // if C++11 (based on comment from @mchiasson)
+    }
+    unknown_pose_x = atoi(elems[0].data());
+    unknown_pose_y = atoi(elems[1].data());
+
+    unknown_pose_x += workspace_min_x;
+
+    unknown_pose_y +=workspace_min_y;
+
+    std::cout<<unknown_pose_x<<" "<<unknown_pose_y<<std::endl;
+
+    perception_manager::GetMetricCoordinate srv;
+    srv.request.x_coord = unknown_pose_x;
+    srv.request.y_coord = unknown_pose_y;
+
+    if(getmetriccoordinate_client.call(srv))
+    {
+
+        point_goal.location.position.x = srv.response.point.point.x;
+        point_goal.location.position.y = srv.response.point.point.y;
+
+        std::cout<<point_goal.location.position.x<<" "<<point_goal.location.position.y<<std::endl;
+
     }
 
-    if(query_objects_client.call(query_objects_srv))
-    {
-        objects = query_objects_srv.response.objects ;
 
-        yumi_manager::SceneObjects so;
-        so.array = objects;
-        scene_publisher.publish(so);
 
-    }
+      //return elems;
 }
 
 void commandCallback(const yumi_eneroth_bridge::CommandConstPtr& msg)
 {
-    if (yumi_busy)
-    {
-        yumi_manager::SceneObjects so;
-        so.yumi_status = 1;
-        scene_publisher.publish(so);
-    }
+
     if (msg->type == "home")
     {
         ROS_INFO("Home action ");
@@ -619,8 +598,16 @@ void commandCallback(const yumi_eneroth_bridge::CommandConstPtr& msg)
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "leap_manager_node");
+    ros::init(argc, argv, "unknown_object_manager_node");
+
     ros::NodeHandle nh;
+
+
+    if(!readWorkspaceConfig("",&workspace_min_x,&workspace_max_x,&workspace_min_y,&workspace_max_y))
+    {
+        ROS_ERROR("Workspace config cannot be read");
+        return -1;
+    }
 
 
     //Create a window
@@ -631,39 +618,23 @@ int main(int argc, char** argv)
 
     createButton("pick_and_place",callBackButtonPickandPlace,NULL,CV_RADIOBOX,1);
     createButton("point",callBackButtonPoint,NULL,CV_RADIOBOX,0);
-    createButton("Refresh Scene",callBackButtonRefreshScene,NULL,CV_PUSH_BUTTON);
     createButton("Home Position",callBackButtonHome,NULL,CV_PUSH_BUTTON);
-    createButton("Plan Action",callBackButtonPlanAction,NULL,CV_PUSH_BUTTON);
+    createButton("Execute",callBackButtonExecute,NULL,CV_PUSH_BUTTON);
 
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber sub = it.subscribe("kinect2/hd/image_color", 1, imageCallback);
+    image_transport::Subscriber sub = it.subscribe("kinect2/qhd/image_color", 1, imageCallback);
 
     listener = new tf::TransformListener(nh);
 
     ros::Subscriber subs = nh.subscribe("yumi_eneroth_bridge/command",1,commandCallback);
 
-    ros::Subscriber leap_hand_subs = nh.subscribe("leap_hands/grasp_left",1,leapHandCallback);
+    ros::Subscriber subs2 = nh.subscribe("detectron/unknown_pose",1,unknownPoseCallback);
+
+
+    getmetriccoordinate_client = nh.serviceClient<perception_manager::GetMetricCoordinate>("perception_manager/get_metric_coordinate");
 
     ros::Publisher joint_pub = nh.advertise<trajectory_msgs::JointTrajectory>("yumi/traj_moveit",10);
 
-    scene_publisher = nh.advertise<yumi_manager::SceneObjects>("yumi_manager/scene_objects",1);
-
-    query_objects_client = nh.serviceClient<perception_manager::QueryObjects>("perception_manager/query_objects");
-
-    planforaction_client = nh.serviceClient<yumi_demos::PlanforAction>("yumi_plan_action");
-
-    perception_manager::QueryObjects query_objects_srv;
-
-    if(query_objects_client.call(query_objects_srv))
-    {
-        objects = query_objects_srv.response.objects ;
-
-    }
-
-    yumi_manager::SceneObjects so;
-    so.yumi_status=0;
-    so.array = objects;
-    scene_publisher.publish(so);
 
     pickplaceClient ppc("moveit_yumi_pick_and_place", true);
     pointClient pc("moveit_yumi_point", true);
@@ -696,58 +667,16 @@ int main(int argc, char** argv)
 
             selected_index = -1;
 
-            if(pick_and_place && !yumi_busy && !planfor_action)
+            if(pick_and_place && !yumi_busy)
             {
                 // send a goal to the action
                 ROS_INFO("Sending goal to pick and place action.");
                 ppc.sendGoal(pickplace_goal,&doneCbPickPlace, &activeCb, &feedbackCbPickPlace);
             }
-            else if(point && !yumi_busy&& !planfor_action)
+            else if(point && !yumi_busy)
             {
                 ROS_INFO("Sending goal to point action.");
                 pc.sendGoal(point_goal,&doneCbPoint,&activeCb,&feedbackCbPoint);
-
-            }
-            else if(pick_and_place && planfor_action)
-            {
-
-
-                yumi_demos::PlanforAction planfor_action_srv;
-
-                planfor_action_srv.request.action = 0;
-
-                planfor_action_srv.request.location = pickplace_goal.location;
-
-                if(planforaction_client.call(planfor_action_srv))
-                {
-                    for(auto robottraj:planfor_action_srv.response.trajectories) {
-
-                        joint_pub.publish(robottraj.joint_trajectory);
-                    }
-
-                }
-
-
-            }
-            else if(point && planfor_action)
-            {
-
-
-                yumi_demos::PlanforAction planfor_action_srv;
-
-                planfor_action_srv.request.action = 1;
-
-                planfor_action_srv.request.location = point_goal.location;
-
-                if(planforaction_client.call(planfor_action_srv))
-                {
-                    for(auto robottraj:planfor_action_srv.response.trajectories) {
-
-                        joint_pub.publish(robottraj.joint_trajectory);
-                    }
-
-                }
-
 
             }
         }

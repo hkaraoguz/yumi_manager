@@ -115,7 +115,7 @@ add_message_files(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+   INCLUDE_DIRS include
 #  LIBRARIES yumi_manager
 # CATKIN_DEPENDS geometry_msgs perception_manager rospy std_msgs
 #  DEPENDS system_lib
@@ -128,7 +128,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
 )
@@ -146,8 +146,10 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
- add_executable(lego_manager_node src/lego_manager_node.cpp)
- add_executable(leap_manager_node src/leap_manager_node.cpp)
+ add_executable(lego_manager_node src/yumi_manager/lego_manager_node.cpp)
+ add_executable(leap_manager_node src/yumi_manager/leap_manager_node.cpp)
+ add_executable(unknown_object_manager_node src/yumi_manager/unkown_object_manager_node.cpp)
+add_executable(test_manager_node src/yumi_manager/test_node.cpp include/yumi_manager/yumi_manager.h src/yumi_manager/yumi_manager.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -159,12 +161,21 @@ include_directories(
 ## same as for the library above
  add_dependencies(lego_manager_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
  add_dependencies(leap_manager_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+ add_dependencies(unknown_object_manager_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+ add_dependencies(test_manager_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(lego_manager_node
    ${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
  )
 target_link_libraries(leap_manager_node
+   ${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
+ )
+
+target_link_libraries(unknown_object_manager_node
+   ${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
+ )
+target_link_libraries(test_manager_node
    ${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
  )
 

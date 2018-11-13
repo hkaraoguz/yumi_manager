@@ -46,11 +46,10 @@ bool yumi_busy = false;
 
 int selected_index = -1;
 
-typedef actionlib::SimpleActionClient<yumi_actions::PickPlaceAction> pickplaceClient;
-typedef actionlib::SimpleActionClient<yumi_actions::PointAction> pointClient;
-typedef actionlib::SimpleActionClient<yumi_actions::HomeAction> homeClient;
+typedef actionlib::SimpleActionClient<yumi_actions::PickPlaceAction> PickPlaceClient;
+typedef actionlib::SimpleActionClient<yumi_actions::PointAction> PointClient;
+typedef actionlib::SimpleActionClient<yumi_actions::HomeAction> HomeClient;
 
-//Mat temp_img;
 Mat ss_img;
 
 
@@ -73,7 +72,7 @@ string getHomePath()
     struct passwd *pw = getpwuid(uid);
 
     if (pw == NULL) {
-        ROS_ERROR("Failed to get homedir. Cannot save configuration file\n");
+        ROS_ERROR("Failed to get homedir. \n");
         return "";
     }
 
@@ -92,7 +91,8 @@ bool saveImage()
 
     if(!(boost::filesystem::exists(dir)))
     {
-        std::cout<<"Doesn't Exists"<<std::endl;
+        ROS_WARN(" %s Directory does not exist. It will be created \n",configpath);
+        //std::cout<<"Doesn't Exists"<<std::endl;
 
     }
 
@@ -526,7 +526,7 @@ int main(int argc, char** argv)
     createButton("Plan Action",callBackButtonPlanAction,NULL,CV_PUSH_BUTTON);
 
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber sub = it.subscribe("kinect2/hd/image_color", 1, imageCallback);
+    image_transport::Subscriber sub = it.subscribe("kinect2/qhd/image_color", 1, imageCallback);
 
     ros::Subscriber subs = nh.subscribe("yumi_eneroth_bridge/command",1,commandCallback);
 
@@ -536,7 +536,7 @@ int main(int argc, char** argv)
 
     query_objects_client = nh.serviceClient<perception_manager::QueryObjects>("perception_manager/query_objects");
 
-    planforaction_client = nh.serviceClient<yumi_demos::PlanforAction>("yumi_plan_action");
+    planforaction_client = nh.serviceClient<yumi_demos::PlanforAction>("moveit_yumi_plan_action");
 
     perception_manager::QueryObjects query_objects_srv;
 
@@ -551,9 +551,9 @@ int main(int argc, char** argv)
     so.array = objects;
     scene_publisher.publish(so);
 
-    pickplaceClient ppc("skill_yumi_pick_and_place", true);
-    pointClient pc("skill_yumi_point", true);
-    homeClient hc("skill_yumi_home", true);
+    PickPlaceClient ppc("moveit_yumi_pick_place", true);
+    PointClient pc("moveit_yumi_point", true);
+    HomeClient hc("moveit_yumi_home", true);
 
 
     ppc.waitForServer(ros::Duration(2));
