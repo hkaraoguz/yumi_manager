@@ -78,18 +78,29 @@ class YumiManager
 
         std::vector<perception_manager::TabletopObject> objects;
 
-    private:
-        image_transport::ImageTransport *it;
-        image_transport::Subscriber* it_sub;
-
         bool image_resized;
-
         int selected_index;
         bool pick_place_action;
         bool point_action;
         bool home_action;
 
-        ros::NodeHandle* nh;
+        bool yumi_busy;
+
+         ros::NodeHandle* nh;
+
+    private:
+        image_transport::ImageTransport *it;
+        image_transport::Subscriber* it_sub;
+
+
+
+
+
+
+
+
+
+
 
 
 
