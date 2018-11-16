@@ -131,8 +131,8 @@ void YumiManager::callbackButtonHomeAction(int state, void *userdata)
 
     manager->home_action = true;
     manager->selected_index = -1;
-    manager->pick_place_action = false;
-    manager->point_action = false;
+    //manager->pick_place_action = false;
+    //manager->point_action = false;
     //pick_and_place = false;
     //point = false;
     //yumi_actions::HomeGoal hgoal;
