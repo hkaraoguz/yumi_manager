@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   trajectory_msgs
   moveit_msgs
   tf
+  ros_cpp_utils
 )
 
 find_package(OpenCV REQUIRED)

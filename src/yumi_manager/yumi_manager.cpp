@@ -22,10 +22,12 @@ YumiManager::YumiManager(std::string point_action_topic, std::string home_action
     this->pick_place_action = true;
     this->point_action = false;
     this->home_action = false;
+    this->draw_workspace = false;
+
     //Create a window
     namedWindow("Workspace", 1);
 
-   // std::cout<<camera_topic;
+    // std::cout<<camera_topic;
 
     //set the callback function for any mouse event
     setMouseCallback("Workspace", callbackWorkspace, this);
@@ -35,12 +37,101 @@ YumiManager::YumiManager(std::string point_action_topic, std::string home_action
     createButton("Home Position",callbackButtonHomeAction,this,CV_PUSH_BUTTON);
     createButton("Plan Action",callbackButtonPlanAction,this,CV_PUSH_BUTTON);
     createButton("Refresh Scene",callbackButtonRefreshScene,this,CV_PUSH_BUTTON);
+    createButton("Show Workspace",callbackButtonShowWorkspace,this,CV_PUSH_BUTTON);
 
 
 
     this->it = new image_transport::ImageTransport(*nh);
     image_transport::Subscriber temp_it_sub = it->subscribe(this->camera_topic, 1, &YumiManager::imageCallback,this);
     this->it_sub =  new image_transport::Subscriber(temp_it_sub);
+
+}
+void YumiManager::callbackButtonShowWorkspace(int state, void *userdata)
+{
+    YumiManager* manager = reinterpret_cast<YumiManager*>(userdata);
+
+
+
+    if(!manager->draw_workspace && manager->readWorkspaceConfig("",&manager->workspace_min_x,&manager->workspace_max_x,&manager->workspace_min_y,&manager->workspace_max_y))
+    {
+        manager->draw_workspace = true;
+
+    }
+    else
+    {
+        manager->draw_workspace = false;
+    }
+
+
+}
+bool YumiManager::readWorkspaceConfig(string path, int *minX, int *maxX, int *minY, int *maxY)
+{
+    string configpath;
+
+    string filename = this->camera_topic;
+
+    std::replace(filename.begin(),filename.end(),'/','_');
+
+    configpath = ROSCppUtils::getHomePath();
+
+    configpath += "/.ros/workspace_segmentation/";
+
+    configpath += "workspace";
+
+    configpath += filename;
+    configpath += ".txt";
+
+    ifstream stream(configpath.data());
+
+    if(stream.is_open())
+    {
+        string str;
+        int count = 0;
+        while(getline(stream, str))
+        {
+
+            std::istringstream ss(str);
+
+            //std::cout<<str<<endl;
+
+            switch(count)
+            {
+            case 0:
+                *minX = atoi(str.data());
+            case 1:
+                *maxX = atoi(str.data());
+            case 2:
+                *minY  = atoi(str.data());
+            case 3:
+                *maxY = atoi(str.data());
+            default:
+                break;
+
+            }
+
+            count++;
+
+        }
+
+
+        stream.close();
+
+
+
+    }
+    else
+    {
+        return false;
+    }
+
+    return true;
+}
+void YumiManager::drawWorkspace(Mat* img)
+{
+
+    Rect rect(workspace_min_x,workspace_min_y,workspace_max_x-workspace_min_x,workspace_max_y-workspace_min_y);
+
+    rectangle(*img,rect,cv::Scalar(0,0,255),2);
 
 }
 void YumiManager::callbackWorkspace(int event, int x, int y, int flags, void *userdata)
@@ -79,7 +170,7 @@ void YumiManager::callbackWorkspace(int event, int x, int y, int flags, void *us
 
             manager->selected_index = min_index;
 
-          /*  if(manager->pick_place_action)
+            /*  if(manager->pick_place_action)
             {
 
                 pickplace_goal.location.position.x = objects[min_index].metricposcenterx;
@@ -131,12 +222,8 @@ void YumiManager::callbackButtonHomeAction(int state, void *userdata)
 
     manager->home_action = true;
     manager->selected_index = -1;
-    //manager->pick_place_action = false;
-    //manager->point_action = false;
-    //pick_and_place = false;
-    //point = false;
-    //yumi_actions::HomeGoal hgoal;
-    ROS_INFO("Sending goal to return home position action.");
+
+    ROS_INFO("Home position action.");
 
 
 }
@@ -144,7 +231,7 @@ void YumiManager::callbackButtonHomeAction(int state, void *userdata)
 void YumiManager::callbackButtonPlanAction(int state, void *userdata)
 {
 
-   /* if (planfor_action){
+    /* if (planfor_action){
 
         ROS_WARN("Plan for action disabled!");
 
@@ -206,6 +293,11 @@ void YumiManager::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 
     Mat temp_img = cv_bridge::toCvShare(msg, "bgr8")->image;
+
+    if(draw_workspace)
+    {
+        drawWorkspace(&temp_img);
+    }
     //ss_img = cv_bridge::toCvCopy(msg, "bgr8")->image;
 
     for(size_t i =0 ; i < this->objects.size(); i++)

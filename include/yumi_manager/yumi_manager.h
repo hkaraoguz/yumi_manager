@@ -34,6 +34,8 @@
 
 #include <yumi_demos/PlanforAction.h>
 
+#include <ros_cpp_utils/utils.h>
+
 typedef actionlib::SimpleActionClient<yumi_actions::PickPlaceAction> PickPlaceClient;
 typedef actionlib::SimpleActionClient<yumi_actions::PointAction> PointClient;
 typedef actionlib::SimpleActionClient<yumi_actions::HomeAction> HomeClient;
@@ -41,59 +43,74 @@ typedef actionlib::SimpleActionClient<yumi_actions::HomeAction> HomeClient;
 
 class YumiManager
 {
-    public:
+public:
 
-        //YumiManager();
+    //YumiManager();
 
-        virtual ~YumiManager();
+    virtual ~YumiManager();
 
-        YumiManager(std::string point_action_topic,std::string home_action_topic, std::string pick_place_action_topic, std::string camera_topic, ros::NodeHandle* nh);
+    YumiManager(std::string point_action_topic,std::string home_action_topic, std::string pick_place_action_topic, std::string camera_topic, ros::NodeHandle* nh);
 
-       void imageCallback(const sensor_msgs::ImageConstPtr& msg);
+    void imageCallback(const sensor_msgs::ImageConstPtr& msg);
 
-       static void callbackButtonPickPlaceAction(int state, void* userdata);
+    static void callbackButtonPickPlaceAction(int state, void* userdata);
 
-       static void callbackButtonPointAction(int state, void* userdata);
+    static void callbackButtonPointAction(int state, void* userdata);
 
-       static void callbackButtonHomeAction(int state, void* userdata);
+    static void callbackButtonHomeAction(int state, void* userdata);
 
-       static void callbackButtonPlanAction(int state, void* userdata);
+    static void callbackButtonPlanAction(int state, void* userdata);
 
-       static void callbackButtonRefreshScene(int state, void* userdata);
+    static void callbackButtonRefreshScene(int state, void* userdata);
 
-       static void callbackWorkspace(int event, int x, int y, int flags, void* userdata);
+    static void callbackWorkspace(int event, int x, int y, int flags, void* userdata);
 
-
-    protected:
-
-        std::string home_action_topic;
-        std::string point_action_topic;
-        std::string pick_place_action_topic;
-
-        std::string camera_topic;
-
-        PickPlaceClient* pick_place_client;
-        HomeClient* home_client;
-        PointClient* point_client;
-
-        std::vector<perception_manager::TabletopObject> objects;
-
-        bool image_resized;
-        int selected_index;
-        bool pick_place_action;
-        bool point_action;
-        bool home_action;
-
-        bool yumi_busy;
-
-         ros::NodeHandle* nh;
-
-    private:
-        image_transport::ImageTransport *it;
-        image_transport::Subscriber* it_sub;
+    static void callbackButtonShowWorkspace(int state, void* userdata);
 
 
 
+protected:
+
+    std::string home_action_topic;
+    std::string point_action_topic;
+    std::string pick_place_action_topic;
+
+    std::string camera_topic;
+
+    PickPlaceClient* pick_place_client;
+    HomeClient* home_client;
+    PointClient* point_client;
+
+    std::vector<perception_manager::TabletopObject> objects;
+
+    bool image_resized;
+    int selected_index;
+    bool pick_place_action;
+    bool point_action;
+    bool home_action;
+
+    bool yumi_busy;
+
+    ros::NodeHandle* nh;
+
+    int workspace_min_x;
+
+    int workspace_min_y;
+
+    int workspace_max_y;
+
+    int workspace_max_x;
+
+private:
+    image_transport::ImageTransport *it;
+    image_transport::Subscriber* it_sub;
+
+    bool readWorkspaceConfig(std::string path, int *minX, int *maxX, int *minY, int *maxY);
+
+
+    void drawWorkspace(cv::Mat* img);
+
+    bool draw_workspace;
 
 
 

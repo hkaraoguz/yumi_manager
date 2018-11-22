@@ -4,10 +4,14 @@ class TestManager:public YumiManager
 {
 
 private:
-    //yumi_actions::PickPlaceAction action;
+
+    // These are the goal objects for actions
+
     yumi_actions::PickPlaceActionGoal pick_place_goal;
 
     yumi_actions::HomeActionGoal home_goal;
+
+    yumi_actions::PointActionGoal point_goal;
 
 
 
@@ -17,7 +21,7 @@ public:
     TestManager(std::string point_action_topic, std::string home_action_topic, std::string pick_place_action_topic,std::string camera_topic, ros::NodeHandle* nh):YumiManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,nh)
     {
 
-        ROS_INFO("Actions have been set");
+        ROS_INFO("Action subscribers have been set. Manager ready...");
 
 
 
@@ -107,6 +111,11 @@ public:
     {
         ROS_INFO("Got Feedback of length");
     }
+    // Called every time feedback is received for the goal
+    void feedbackCbPoint(const yumi_actions::PointFeedbackConstPtr& feedback)
+    {
+        ROS_INFO("Got Feedback of length");
+    }
 
     // Called every time feedback is received for the goal
     void feedbackCbHome(const yumi_actions::HomeFeedbackConstPtr& feedback)
@@ -149,6 +158,21 @@ public:
                     std::cout<<"Goal "<<this->objects[this->selected_index].metricposcenterx<<" "<<this->objects[this->selected_index].metricposcentery;
 
                     this->pick_place_client->sendGoal(this->pick_place_goal.goal,boost::bind(&TestManager::doneCbPickPlace, this, _1, _2),boost::bind(&TestManager::activeCb, this),boost::bind(&TestManager::feedbackCbPickPlace, this, _1));
+
+                    this->selected_index = -1;
+
+                }
+                else if(this->point_action)
+                {
+                    this->point_goal.goal.location.position.x = this->objects[this->selected_index].metricposcenterx;
+                    this->point_goal.goal.location.position.y = this->objects[this->selected_index].metricposcentery;
+                    this->point_goal.goal.location.position.z = this->objects[this->selected_index].metricposcenterz;
+
+                    this->point_goal.goal.location.orientation.z = this->objects[this->selected_index].angle;
+
+                    std::cout<<" Point Goal "<<this->objects[this->selected_index].metricposcenterx<<" "<<this->objects[this->selected_index].metricposcentery<<" "<<this->objects[this->selected_index].metricposcenterz<<std::endl;
+
+                    this->point_client->sendGoal(this->point_goal.goal,boost::bind(&TestManager::doneCbPoint, this, _1, _2),boost::bind(&TestManager::activeCb, this),boost::bind(&TestManager::feedbackCbPoint, this, _1));
 
                     this->selected_index = -1;
 
