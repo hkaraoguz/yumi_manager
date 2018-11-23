@@ -1,5 +1,8 @@
 #include <yumi_manager/yumi_manager.h>
 
+#include <yumi_actions/PlanPickPlace.h>
+
+
 class TestManager:public YumiManager
 {
 
@@ -13,6 +16,8 @@ private:
 
     yumi_actions::PointActionGoal point_goal;
 
+    ros::Publisher trajectory_publisher ;
+
 
 
 public:
@@ -23,7 +28,7 @@ public:
 
         ROS_INFO("Action subscribers have been set. Manager ready...");
 
-
+       trajectory_publisher = this->nh->advertise<trajectory_msgs::JointTrajectory>("/yumi_manager/moveit_trajectory",10);
 
     }
 
@@ -149,13 +154,45 @@ public:
                 if(this->pick_place_action)
                 {
 
+
+
+
                     this->pick_place_goal.goal.location.position.x = this->objects[this->selected_index].metricposcenterx;
                     this->pick_place_goal.goal.location.position.y = this->objects[this->selected_index].metricposcentery;
                     this->pick_place_goal.goal.location.position.z = this->objects[this->selected_index].metricposcenterz;
 
                     this->pick_place_goal.goal.location.orientation.z = this->objects[this->selected_index].angle;
 
-                    std::cout<<"Goal "<<this->objects[this->selected_index].metricposcenterx<<" "<<this->objects[this->selected_index].metricposcentery;
+                    std::cout<<"Pick Place Goal "<<this->objects[this->selected_index].metricposcenterx<<" "<<this->objects[this->selected_index].metricposcentery<<" "<<this->objects[this->selected_index].metricposcenterz<<std::endl;
+
+                    if(this->plan_action)
+                    {
+
+                        yumi_actions::PlanPickPlace plan_action_srv;
+
+                        plan_action_srv.request.goal = this->pick_place_goal.goal.location ;
+
+                        //scene_publisher = nh.advertise<yumi_manager::SceneObjects>("yumi_manager/scene_objects",1);
+
+                        //query_objects_client = this->nh->serviceClient<perception_manager::QueryObjects>("perception_manager/query_objects");
+
+                        ros::ServiceClient planaction_client = this->nh->serviceClient<yumi_demos::PlanforAction>("moveit_yumi_plan_pick_place_action");
+
+
+                        if(planaction_client.call(plan_action_srv))
+                        {
+                            for(auto robottraj:plan_action_srv.response.trajectories) {
+
+                                trajectory_publisher.publish(robottraj.joint_trajectory);
+                            }
+
+                        }
+
+                        this->selected_index = -1;
+
+                        return;
+
+                    }
 
                     this->pick_place_client->sendGoal(this->pick_place_goal.goal,boost::bind(&TestManager::doneCbPickPlace, this, _1, _2),boost::bind(&TestManager::activeCb, this),boost::bind(&TestManager::feedbackCbPickPlace, this, _1));
 

@@ -91,6 +91,8 @@ protected:
 
     bool yumi_busy;
 
+    bool plan_action;
+
     ros::NodeHandle* nh;
 
     int workspace_min_x;

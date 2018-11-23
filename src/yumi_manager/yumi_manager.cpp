@@ -24,6 +24,8 @@ YumiManager::YumiManager(std::string point_action_topic, std::string home_action
     this->home_action = false;
     this->draw_workspace = false;
 
+    this->plan_action= false;
+
     //Create a window
     namedWindow("Workspace", 1);
 
@@ -154,8 +156,8 @@ void YumiManager::callbackWorkspace(int event, int x, int y, int flags, void *us
         {
             int sum = 0;
 
-            sum+= abs(manager->objects[i].pixelposcenterx-x);
-            sum+= abs(y-manager->objects[i].pixelposcentery);
+            sum+= abs(manager->objects[i].pixelposcenterx - x);
+            sum+= abs(y - manager->objects[i].pixelposcentery);
 
             if(sum < min_sum)
             {
@@ -169,31 +171,6 @@ void YumiManager::callbackWorkspace(int event, int x, int y, int flags, void *us
             ROS_INFO("Selected id: %d",min_index);
 
             manager->selected_index = min_index;
-
-            /*  if(manager->pick_place_action)
-            {
-
-                pickplace_goal.location.position.x = objects[min_index].metricposcenterx;
-                pickplace_goal.location.position.y = objects[min_index].metricposcentery;
-
-                if(objects[min_index].angle > 0)
-                    pickplace_goal.location.orientation.z = objects[min_index].angle;
-                else
-                    pickplace_goal.location.orientation.z = objects[min_index].angle;
-                //wait for the action to return
-                // bool finished_before_timeout = ac.waitForResult(ros::Duration(30.0));
-                //ROS_INFO("Angle %.2f", pickplace_goal.location.orientation.z*180/3.14159);
-
-            }
-            else if(this->point_action)
-            {
-                point_goal.location.position.x = objects[min_index].metricposcenterx;
-                point_goal.location.position.y = objects[min_index].metricposcentery;
-
-
-            }*/
-
-
 
 
         }
@@ -230,21 +207,23 @@ void YumiManager::callbackButtonHomeAction(int state, void *userdata)
 
 void YumiManager::callbackButtonPlanAction(int state, void *userdata)
 {
+    YumiManager* manager = reinterpret_cast<YumiManager*>(userdata);
 
-    /* if (planfor_action){
+     if (manager->plan_action){
 
         ROS_WARN("Plan for action disabled!");
 
-        planfor_action = false;
+        manager->plan_action = false;
 
     }
-    else{
-        planfor_action = true;
+    else
+     {
+        manager->plan_action = true;
 
         ROS_WARN("Plan for action enabled!");
-    }*/
+    }
 
-    return ;
+
 
 
 }
