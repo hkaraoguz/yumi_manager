@@ -49,7 +49,7 @@ public:
 
     virtual ~YumiManager();
 
-    YumiManager(std::string point_action_topic,std::string home_action_topic, std::string pick_place_action_topic, std::string camera_topic, ros::NodeHandle* nh);
+    YumiManager(std::string point_action_topic,std::string home_action_topic, std::string pick_place_action_topic, std::string camera_topic, std::string controller_type, ros::NodeHandle* nh);
 
     void imageCallback(const sensor_msgs::ImageConstPtr& msg);
 
@@ -67,7 +67,7 @@ public:
 
     static void callbackButtonShowWorkspace(int state, void* userdata);
 
-
+    
 
 protected:
 
@@ -102,6 +102,11 @@ protected:
     int workspace_max_y;
 
     int workspace_max_x;
+
+    std::string controller_type;
+    
+    void publishScene(int yumi_status, ros::Publisher* publisher);
+
 
 private:
     image_transport::ImageTransport *it;

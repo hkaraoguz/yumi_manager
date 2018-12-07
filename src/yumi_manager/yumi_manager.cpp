@@ -3,7 +3,7 @@
 using namespace cv;
 using namespace std;
 
-YumiManager::YumiManager(std::string point_action_topic, std::string home_action_topic, std::string pick_place_action_topic, std::string camera_topic, ros::NodeHandle* nh)
+YumiManager::YumiManager(std::string point_action_topic, std::string home_action_topic, std::string pick_place_action_topic, std::string camera_topic, std::string controller_type,ros::NodeHandle* nh)
 {
     this->point_action_topic = point_action_topic;
     this->home_action_topic = home_action_topic;
@@ -14,6 +14,7 @@ YumiManager::YumiManager(std::string point_action_topic, std::string home_action
     this->point_client = new PointClient(this->point_action_topic, true);
     this->home_client = new HomeClient(this->home_action_topic, true);
     this->image_resized = false;
+    this->controller_type = controller_type;
 
     this->nh = nh;
 
@@ -308,6 +309,14 @@ void YumiManager::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     }
 
     cv::waitKey(1);
+}
+void YumiManager::publishScene(int yumi_status, ros::Publisher* publisher)
+{
+    yumi_manager::SceneObjects so;
+
+    so.array = this->objects;
+    so.yumi_status=yumi_status;
+    publisher->publish(so);
 }
 
 YumiManager::~YumiManager()

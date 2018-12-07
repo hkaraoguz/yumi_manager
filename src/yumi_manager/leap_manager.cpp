@@ -6,8 +6,10 @@
 
 #include <yumi_manager/SceneObjects.h>
 
+#include <sensor_msgs/CameraInfo.h>
 
-class TestManager:public YumiManager
+
+class LeapManager:public YumiManager
 {
 
 private:
@@ -26,12 +28,26 @@ private:
 
     ros::Publisher scene_publisher;
 
+    std::string camera_info_topic;
+
+    ros::Subscriber camera_info_subscriber;
+
+    float camera_focal_length_x ;
+
+    float camera_focal_length_y;
+
+    float camera_center_x;
+
+    float camera_center_y;
+
+    ros::Subscriber leap_hand_subs;
+
 
 
 public:
 
 
-    TestManager(std::string point_action_topic, std::string home_action_topic, std::string pick_place_action_topic,std::string camera_topic, std::string controller_type, ros::NodeHandle* nh):YumiManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,controller_type,nh)
+    LeapManager(std::string point_action_topic, std::string home_action_topic, std::string pick_place_action_topic,std::string camera_topic,std::string camera_info_topic, std::string controller_type, ros::NodeHandle* nh):YumiManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,controller_type,nh)
     {
 
         ROS_INFO("Action subscribers have been set. Manager ready...");
@@ -41,8 +57,76 @@ public:
         // This publishes the current state of the scene and latest status of yumi
         this->scene_publisher = nh->advertise<yumi_manager::SceneObjects>("yumi_manager/scene_objects",1);
 
+        this->camera_info_topic = camera_info_topic;
+
+        this->camera_info_subscriber = nh->subscribe(this->camera_info_topic,1,&cameraInfoCallback,this);
+
+        this->leap_hand_subs = nh->subscribe("leap_hands/grasp_left",1,&leapHandCallback,this);
+
+
 
     }
+
+    void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
+    {
+        this->camera_focal_length_x = msg.K[0];
+        this->camera_focal_length_y = msg.K[4];
+
+        this->camera_center_x = msg.K[2];
+        this->camera_center_y = msg.K[5];
+
+        this->camera_info_subscriber.shutdown();
+
+
+    }
+    // User's left hand is closed
+    void leapHandCallback(std_msgs::Float32 msg)
+    {
+        if(msg.data == 1.0)
+        {
+            int min_sum = 100000;
+            int min_index = -1;
+
+            for(size_t i =0 ; i < this->objects.size(); i++)
+            {
+                int sum = 0;
+
+                sum+= abs(this->objects[i].pixelposcenterx-leap_pixel_x);
+                sum+= abs(leap_pixel_y-this->objects[i].pixelposcentery);
+
+                if(sum < min_sum)
+                {
+                    min_sum = sum;
+                    min_index = i;
+                }
+            }
+
+            if(min_index >= 0  && min_sum <= 30)
+            {
+                ROS_INFO("Selected id: %d",min_index);
+
+                selected_index = min_index;
+
+                /*if(pick_and_place)
+                {
+
+                    pickplace_goal.location.position.x = objects[min_index].metricposcenterx;
+                    pickplace_goal.location.position.y = objects[min_index].metricposcentery;
+
+                    if(objects[min_index].angle > 0)
+                        pickplace_goal.location.orientation.z = objects[min_index].angle;
+                    else
+                        pickplace_goal.location.orientation.z = objects[min_index].angle;
+                    //wait for the action to return
+                    // bool finished_before_timeout = ac.waitForResult(ros::Duration(30.0));
+                    ROS_INFO("Angle %.2f", pickplace_goal.location.orientation.z*180/3.14159);
+
+                }*/
+            }
+        }
+
+    }
+
 
     void doneCbPickPlace(const actionlib::SimpleClientGoalState& state,
                          const yumi_actions::PickPlaceResultConstPtr& result)
@@ -162,7 +246,7 @@ public:
 
                 //this->home_client->sendGoal(home_goal.goal);
 
-                this->home_client->sendGoal(home_goal.goal,boost::bind(&TestManager::doneCbHome, this, _1, _2),boost::bind(&TestManager::activeCb, this),boost::bind(&TestManager::feedbackCbHome, this, _1));
+                this->home_client->sendGoal(home_goal.goal,boost::bind(&LeapManager::doneCbHome, this, _1, _2),boost::bind(&LeapManager::activeCb, this),boost::bind(&LeapManager::feedbackCbHome, this, _1));
 
 
             }
@@ -217,7 +301,7 @@ public:
                         ROS_WARN("Action cannot be planned ahead for controllers other than MoveIt");
                     }
 
-                    this->pick_place_client->sendGoal(this->pick_place_goal.goal,boost::bind(&TestManager::doneCbPickPlace, this, _1, _2),boost::bind(&TestManager::activeCb, this),boost::bind(&TestManager::feedbackCbPickPlace, this, _1));
+                    this->pick_place_client->sendGoal(this->pick_place_goal.goal,boost::bind(&LeapManager::doneCbPickPlace, this, _1, _2),boost::bind(&LeapManager::activeCb, this),boost::bind(&LeapManager::feedbackCbPickPlace, this, _1));
 
                     this->selected_index = -1;
 
@@ -270,7 +354,7 @@ public:
 
 
 
-                    this->point_client->sendGoal(this->point_goal.goal,boost::bind(&TestManager::doneCbPoint, this, _1, _2),boost::bind(&TestManager::activeCb, this),boost::bind(&TestManager::feedbackCbPoint, this, _1));
+                    this->point_client->sendGoal(this->point_goal.goal,boost::bind(&LeapManager::doneCbPoint, this, _1, _2),boost::bind(&LeapManager::activeCb, this),boost::bind(&LeapManager::feedbackCbPoint, this, _1));
 
                     this->selected_index = -1;
 
@@ -296,10 +380,12 @@ int main(int argc, char** argv)
     std::string pick_place_action_topic;
     std::string camera_topic;
     std::string controller_type;
+    std::string camera_info_topic;
 
 
     local_nh.param<std::string>("controller_type", controller_type, "moveit");
     local_nh.param<std::string>("camera_topic", camera_topic, "/kinect2/qhd/image_color");
+    local_nh.param<std::string>("camera_info_topic",camera_info_topic,"/kinect2/qhd/camera_info");
 
 
     home_action_topic = controller_type+"_yumi_home";
@@ -309,7 +395,7 @@ int main(int argc, char** argv)
 
     ROS_INFO("Controller type is %s",controller_type.data());
 
-    TestManager* testManager = new TestManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,controller_type,&nh);
+    LeapManager* LeapManager = new LeapManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,camera_info_topic,controller_type,&nh);
 
     ros::Rate r(30);
 
@@ -318,14 +404,15 @@ int main(int argc, char** argv)
 
         ros::spinOnce();
 
-        testManager->loop();
+        LeapManager->loop();
 
     }
 
-    delete testManager;
+    delete LeapManager;
 
     return 0;
 }
+
 
 
 
