@@ -44,6 +44,8 @@ public:
 
     }
 
+
+
     void doneCbPickPlace(const actionlib::SimpleClientGoalState& state,
                          const yumi_actions::PickPlaceResultConstPtr& result)
     {

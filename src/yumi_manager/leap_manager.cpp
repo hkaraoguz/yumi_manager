@@ -8,6 +8,14 @@
 
 #include <sensor_msgs/CameraInfo.h>
 
+#include <tf/transform_listener.h>
+
+#include <std_msgs/Float32.h>
+
+using namespace std;
+
+using namespace cv;
+
 
 class LeapManager:public YumiManager
 {
@@ -42,12 +50,22 @@ private:
 
     ros::Subscriber leap_hand_subs;
 
+    int leap_pixel_x;
+
+    int leap_pixel_y;
+
+    std::string camera_optical_frame;
+
+    std::string leapmotion_frame;
+
+    tf::TransformListener* listener;
+
 
 
 public:
 
 
-    LeapManager(std::string point_action_topic, std::string home_action_topic, std::string pick_place_action_topic,std::string camera_topic,std::string camera_info_topic, std::string controller_type, ros::NodeHandle* nh):YumiManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,controller_type,nh)
+    LeapManager(std::string point_action_topic, std::string home_action_topic, std::string pick_place_action_topic,std::string camera_topic,std::string camera_info_topic, std::string controller_type, std::string camera_optical_frame,std::string leapmotion_frame, ros::NodeHandle* nh):YumiManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,controller_type,nh)
     {
 
         ROS_INFO("Action subscribers have been set. Manager ready...");
@@ -59,11 +77,114 @@ public:
 
         this->camera_info_topic = camera_info_topic;
 
-        this->camera_info_subscriber = nh->subscribe(this->camera_info_topic,1,&cameraInfoCallback,this);
+        this->camera_info_subscriber = nh->subscribe(this->camera_info_topic,1,&LeapManager::cameraInfoCallback,this);
 
-        this->leap_hand_subs = nh->subscribe("leap_hands/grasp_left",1,&leapHandCallback,this);
+        this->leap_hand_subs = nh->subscribe("leap_hands/grasp_left",1,&LeapManager::leapHandCallback,this);
+
+        this->camera_optical_frame = camera_optical_frame;
+
+        this->leapmotion_frame = leapmotion_frame;
+
+        this->listener = new tf::TransformListener(*nh);
 
 
+    }
+
+    void imageCallback(const sensor_msgs::ImageConstPtr& msg)
+    {
+
+        char key = (char)cv::waitKey(20);
+
+
+        if( key == 27){
+
+
+            ROS_INFO("Shutting down the node...");
+            ros::shutdown();
+        }
+
+
+
+        tf::StampedTransform transform;
+
+
+
+        try
+        {
+            //if(listener.waitForTransform("yumi_base_link","teleop_left_frame",ros::Time::now(), ros::Duration(1.0)))
+            //{
+            if(listener->waitForTransform(this->camera_optical_frame,this->leapmotion_frame,ros::Time::now(), ros::Duration(1.0))){
+                listener->lookupTransform(this->camera_optical_frame,this->leapmotion_frame,
+                                          ros::Time(0), transform);
+
+                //  std::cout<<"Left hand position"<<transform1.getOrigin().getX()<<" "<<transform1.getOrigin().getZ()<<std::endl;
+
+
+
+                calculatePixelPosition(transform.getOrigin().getX(),transform.getOrigin().getY(),transform.getOrigin().getZ(),&leap_pixel_x,&leap_pixel_y);
+            }
+
+            //   std::cout<<"Left hand position in pixels "<<leap_pixel_x<<" "<<leap_pixel_y<<std::endl;
+
+            //}
+
+
+
+        }
+
+        catch (tf::TransformException ex){
+            //ROS_ERROR("%s",ex.what());
+            //ros::Duration(1.0).sleep();
+        }
+
+        Mat temp_img = cv_bridge::toCvShare(msg, "bgr8")->image;
+        Mat ss_img = cv_bridge::toCvCopy(msg, "bgr8")->image;
+
+        for(size_t i =0 ; i < objects.size(); i++)
+        {
+            Point pt;
+            pt.x = objects[i].pixelposcenterx;
+            pt.y = objects[i].pixelposcentery;
+
+            circle(temp_img, pt, 3, cv::Scalar(0,0,255), -1);
+            stringstream ss;
+            ss<<objects[i].id;
+            pt.x +=3;
+            pt.x +=3;
+            putText(temp_img, ss.str(), pt, 0, 0.4, cv::Scalar(0,0,255), 2);
+        }
+
+        Point pt;
+
+        pt.x = leap_pixel_x;
+        pt.y = leap_pixel_y;
+
+        circle(temp_img, pt, 6, cv::Scalar(255,0,255), -1);
+
+        Mat img;
+
+        if (temp_img.rows > 1000)
+        {
+            this->image_resized = true;
+            Mat img;
+            resize(temp_img,img,cv::Size(0,0),0.5,0.5);
+            imshow("Workspace",img);
+
+        }
+        else
+        {
+            imshow("Workspace",temp_img);
+
+        }
+
+        cv::waitKey(1);
+    }
+
+    void calculatePixelPosition(double posx, double posy, double posz, int* pixelx, int* pixely)
+    {
+        *pixelx = (int)(posx*this->camera_focal_length_x/posz)+this->camera_center_x;
+
+        *pixely= (int)(posy*this->camera_focal_length_y/posz)+this->camera_center_y;
 
     }
 
@@ -80,7 +201,7 @@ public:
 
     }
     // User's left hand is closed
-    void leapHandCallback(std_msgs::Float32 msg)
+    void leapHandCallback(const std_msgs::Float32& msg)
     {
         if(msg.data == 1.0)
         {
@@ -371,7 +492,7 @@ public:
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "test_manager_node");
+    ros::init(argc, argv, "leap_manager_node");
     ros::NodeHandle nh;
     ros::NodeHandle local_nh("~");
 
@@ -382,10 +503,20 @@ int main(int argc, char** argv)
     std::string controller_type;
     std::string camera_info_topic;
 
+    std::string camera_optical_frame;
+    std::string leapmotion_frame;
+
 
     local_nh.param<std::string>("controller_type", controller_type, "moveit");
     local_nh.param<std::string>("camera_topic", camera_topic, "/kinect2/qhd/image_color");
     local_nh.param<std::string>("camera_info_topic",camera_info_topic,"/kinect2/qhd/camera_info");
+
+    local_nh.param<std::string>("camera_optical_frame",camera_optical_frame,"/kinect2_rgb_optical_frame");
+
+    local_nh.param<std::string>("leapmotion_frame",leapmotion_frame,"/teleop_left_frame");
+
+
+
 
 
     home_action_topic = controller_type+"_yumi_home";
@@ -395,7 +526,7 @@ int main(int argc, char** argv)
 
     ROS_INFO("Controller type is %s",controller_type.data());
 
-    LeapManager* LeapManager = new LeapManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,camera_info_topic,controller_type,&nh);
+    LeapManager* leapManager = new LeapManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,camera_info_topic,controller_type,camera_optical_frame,leapmotion_frame,&nh);
 
     ros::Rate r(30);
 
@@ -404,11 +535,11 @@ int main(int argc, char** argv)
 
         ros::spinOnce();
 
-        LeapManager->loop();
+        leapManager->loop();
 
     }
 
-    delete LeapManager;
+    delete leapManager;
 
     return 0;
 }

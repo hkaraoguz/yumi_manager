@@ -51,7 +51,7 @@ public:
 
     YumiManager(std::string point_action_topic,std::string home_action_topic, std::string pick_place_action_topic, std::string camera_topic, std::string controller_type, ros::NodeHandle* nh);
 
-    void imageCallback(const sensor_msgs::ImageConstPtr& msg);
+    virtual void imageCallback(const sensor_msgs::ImageConstPtr& msg);
 
     static void callbackButtonPickPlaceAction(int state, void* userdata);
 
