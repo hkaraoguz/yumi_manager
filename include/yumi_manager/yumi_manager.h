@@ -32,8 +32,6 @@
 #include <moveit_msgs/RobotTrajectory.h>
 #include <trajectory_msgs/JointTrajectory.h>
 
-#include <yumi_demos/PlanforAction.h>
-
 #include <ros_cpp_utils/utils.h>
 
 typedef actionlib::SimpleActionClient<yumi_actions::PickPlaceAction> PickPlaceClient;
