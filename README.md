@@ -14,11 +14,14 @@ This package is created for high level interfacing with Yumi using different mot
 
 The `yumi_manager` package is developed using inheritance to embed the basic functionality by default. Thus the user can modify the existing high-level control code easily according to his/her needs.
 
+![Yumi Control Interface](documentation/gui.png)
+
+
 Running it with Yumi Pedestal Setup
 -----------------
-For using the node on the Yumi pedestal setup first make sure that the Yumi is running with either `moveit` or `skill` motion control interface.
+For using the node with Yumi pedestal setup, first make sure that the Yumi is running with either `moveit` or `skill` motion control interface.
 
-Simply launch the associated launch file to run the whole high-level control pipeline:
+If the robot is running, simply launch the associated launch file to run the whole high-level control pipeline:
 ```
 roslaunch fact_launch perception_<motion_control_interface>.launch
 ```
