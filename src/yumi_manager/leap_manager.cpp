@@ -60,6 +60,8 @@ private:
 
     tf::TransformListener* listener;
 
+    float msg_data_sum;
+
 
 
 public:
@@ -68,7 +70,6 @@ public:
     LeapManager(std::string point_action_topic, std::string home_action_topic, std::string pick_place_action_topic,std::string camera_topic,std::string camera_info_topic, std::string controller_type, std::string camera_optical_frame,std::string leapmotion_frame, ros::NodeHandle* nh):YumiManager(point_action_topic,home_action_topic,pick_place_action_topic,camera_topic,controller_type,nh)
     {
 
-        ROS_INFO("Action subscribers have been set. Manager ready...");
 
         trajectory_publisher = this->nh->advertise<trajectory_msgs::JointTrajectory>("/yumi_manager/moveit_trajectory",10);
 
@@ -86,6 +87,13 @@ public:
         this->leapmotion_frame = leapmotion_frame;
 
         this->listener = new tf::TransformListener(*nh);
+
+        this->yumi_busy = false;
+
+        this->msg_data_sum = 0.0;
+
+        ROS_INFO("Leap Manager ready...");
+
 
 
     }
@@ -105,34 +113,33 @@ public:
 
 
 
+
+
         tf::StampedTransform transform;
 
 
 
         try
         {
-            //if(listener.waitForTransform("yumi_base_link","teleop_left_frame",ros::Time::now(), ros::Duration(1.0)))
-            //{
-            if(listener->waitForTransform(this->camera_optical_frame,this->leapmotion_frame,ros::Time::now(), ros::Duration(1.0))){
-                listener->lookupTransform(this->camera_optical_frame,this->leapmotion_frame,
-                                          ros::Time(0), transform);
 
-                //  std::cout<<"Left hand position"<<transform1.getOrigin().getX()<<" "<<transform1.getOrigin().getZ()<<std::endl;
+            if(listener->waitForTransform(this->camera_optical_frame,this->leapmotion_frame,ros::Time::now(), ros::Duration(1.0)))
+            {
 
 
+                listener->lookupTransform(this->camera_optical_frame,this->leapmotion_frame, ros::Time(0), transform);
 
-                calculatePixelPosition(transform.getOrigin().getX(),transform.getOrigin().getY(),transform.getOrigin().getZ(),&leap_pixel_x,&leap_pixel_y);
+
+                calculateLeapPixelPosition(transform.getOrigin().getX(),transform.getOrigin().getY(),transform.getOrigin().getZ(),&leap_pixel_x,&leap_pixel_y);
             }
 
-            //   std::cout<<"Left hand position in pixels "<<leap_pixel_x<<" "<<leap_pixel_y<<std::endl;
 
-            //}
 
 
 
         }
 
-        catch (tf::TransformException ex){
+        catch (tf::TransformException ex)
+        {
             //ROS_ERROR("%s",ex.what());
             //ros::Duration(1.0).sleep();
         }
@@ -180,7 +187,7 @@ public:
         cv::waitKey(1);
     }
 
-    void calculatePixelPosition(double posx, double posy, double posz, int* pixelx, int* pixely)
+    void calculateLeapPixelPosition(double posx, double posy, double posz, int* pixelx, int* pixely)
     {
         *pixelx = (int)(posx*this->camera_focal_length_x/posz)+this->camera_center_x;
 
@@ -196,6 +203,8 @@ public:
         this->camera_center_x = msg.K[2];
         this->camera_center_y = msg.K[5];
 
+        ROS_WARN("Camera paremeters received. Focal Length x: %.2f Focal length y: %.2f Focal center x: %.2f Focal center y: %.2f",this->camera_focal_length_x,this->camera_focal_length_y,this->camera_center_x,this->camera_center_y);
+
         this->camera_info_subscriber.shutdown();
 
 
@@ -203,8 +212,11 @@ public:
     // User's left hand is closed
     void leapHandCallback(const std_msgs::Float32& msg)
     {
-        if(msg.data == 1.0)
+        this->msg_data_sum += msg.data;
+
+        if(this->msg_data_sum >= 100.0 && this->selected_index < 0)
         {
+            this->msg_data_sum = 0.0;
             int min_sum = 100000;
             int min_index = -1;
 
@@ -228,23 +240,11 @@ public:
 
                 selected_index = min_index;
 
-                /*if(pick_and_place)
-                {
 
-                    pickplace_goal.location.position.x = objects[min_index].metricposcenterx;
-                    pickplace_goal.location.position.y = objects[min_index].metricposcentery;
-
-                    if(objects[min_index].angle > 0)
-                        pickplace_goal.location.orientation.z = objects[min_index].angle;
-                    else
-                        pickplace_goal.location.orientation.z = objects[min_index].angle;
-                    //wait for the action to return
-                    // bool finished_before_timeout = ac.waitForResult(ros::Duration(30.0));
-                    ROS_INFO("Angle %.2f", pickplace_goal.location.orientation.z*180/3.14159);
-
-                }*/
             }
         }
+
+
 
     }
 
@@ -365,7 +365,6 @@ public:
 
                 this->home_action = false;
 
-                //this->home_client->sendGoal(home_goal.goal);
 
                 this->home_client->sendGoal(home_goal.goal,boost::bind(&LeapManager::doneCbHome, this, _1, _2),boost::bind(&LeapManager::activeCb, this),boost::bind(&LeapManager::feedbackCbHome, this, _1));
 
@@ -396,9 +395,6 @@ public:
 
                         plan_action_srv.request.goal = this->pick_place_goal.goal.location ;
 
-                        //scene_publisher = nh.advertise<yumi_manager::SceneObjects>("yumi_manager/scene_objects",1);
-
-                        //query_objects_client = this->nh->serviceClient<perception_manager::QueryObjects>("perception_manager/query_objects");
 
                         ros::ServiceClient planaction_client = this->nh->serviceClient<yumi_actions::PlanPickPlace>("moveit_yumi_plan_pick_place_action");
 
@@ -445,10 +441,6 @@ public:
 
                         plan_point_srv.request.goal = this->point_goal.goal.location ;
 
-                        //scene_publisher = nh.advertise<yumi_manager::SceneObjects>("yumi_manager/scene_objects",1);
-
-                        //query_objects_client = this->nh->serviceClient<perception_manager::QueryObjects>("perception_manager/query_objects");
-
                         ros::ServiceClient plan_action_client = this->nh->serviceClient<yumi_actions::PlanPoint>("moveit_yumi_plan_point_action");
 
 
@@ -470,9 +462,6 @@ public:
                     {
                         ROS_WARN("Action cannot be planned ahead for controllers other than MoveIt");
                     }
-
-
-
 
 
                     this->point_client->sendGoal(this->point_goal.goal,boost::bind(&LeapManager::doneCbPoint, this, _1, _2),boost::bind(&LeapManager::activeCb, this),boost::bind(&LeapManager::feedbackCbPoint, this, _1));
@@ -514,9 +503,6 @@ int main(int argc, char** argv)
     local_nh.param<std::string>("camera_optical_frame",camera_optical_frame,"/kinect2_rgb_optical_frame");
 
     local_nh.param<std::string>("leapmotion_frame",leapmotion_frame,"/teleop_left_frame");
-
-
-
 
 
     home_action_topic = controller_type+"_yumi_home";
